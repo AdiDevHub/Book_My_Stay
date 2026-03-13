@@ -1,75 +1,39 @@
 import java.util.*;
+import java.util.stream.Collectors;
 
-// Mock classes to support the concurrency logic
-class Reservation {
-    String guestName;
+// Represents a booking for analytics
+class Booking {
     String roomType;
-    Reservation(String n, String t) { this.guestName = n; this.roomType = t; }
+    double price;
+    Booking(String type, double price) { this.roomType = type; this.price = price; }
 }
 
-class BookingRequestQueue {
-    private Queue<Reservation> queue = new LinkedList<>();
-    public void add(Reservation r) { queue.add(r); }
-    public boolean isEmpty() { return queue.isEmpty(); }
-    public Reservation poll() { return queue.poll(); }
-}
+class AnalyticsService {
+    public void generateReport(List<Booking> bookings) {
+        System.out.println("Booking Statistics & Analytics");
 
-class RoomInventory {
-    int single = 5, doubleR = 3, suite = 2;
-}
+        // Count bookings per type
+        Map<String, Long> counts = bookings.stream()
+                .collect(Collectors.groupingBy(b -> b.roomType, Collectors.counting()));
 
-class RoomAllocationService {
-    public void allocateRoom(Reservation r, RoomInventory inv) {
-        System.out.println("Booking confirmed for Guest: " + r.guestName + ", Room ID: " + r.roomType + "-" + (r.roomType.equals("Single")?inv.single--:inv.doubleR--));
-    }
-}
+        // Calculate total revenue
+        double totalRevenue = bookings.stream().mapToDouble(b -> b.price).sum();
 
-class ConcurrentBookingProcessor implements Runnable {
-    private BookingRequestQueue bookingQueue;
-    private RoomInventory inventory;
-    private RoomAllocationService allocationService;
-
-    public ConcurrentBookingProcessor(BookingRequestQueue bq, RoomInventory inv, RoomAllocationService as) {
-        this.bookingQueue = bq;
-        this.inventory = inv;
-        this.allocationService = as;
-    }
-
-    @Override
-    public void run() {
-        while (true) {
-            Reservation reservation;
-            synchronized (bookingQueue) {
-                if (bookingQueue.isEmpty()) break;
-                reservation = bookingQueue.poll();
-            }
-            if (reservation != null) {
-                synchronized (inventory) {
-                    allocationService.allocateRoom(reservation, inventory);
-                }
-            }
-        }
+        counts.forEach((type, count) ->
+                System.out.println("Room Type: " + type + " | Count: " + count));
+        System.out.println("Total Revenue: " + totalRevenue);
     }
 }
 
 public class BookMyStay {
     public static void main(String[] args) {
-        BookingRequestQueue queue = new BookingRequestQueue();
-        queue.add(new Reservation("Abhi", "Single"));
-        queue.add(new Reservation("Vanmathi", "Double"));
-        queue.add(new Reservation("Kural", "Suite"));
-        queue.add(new Reservation("Subha", "Single"));
+        List<Booking> bookings = Arrays.asList(
+                new Booking("Single", 1200.0),
+                new Booking("Double", 2000.0),
+                new Booking("Single", 1200.0),
+                new Booking("Suite", 5000.0)
+        );
 
-        RoomInventory inventory = new RoomInventory();
-        RoomAllocationService service = new RoomAllocationService();
-
-        Thread t1 = new Thread(new ConcurrentBookingProcessor(queue, inventory, service));
-        Thread t2 = new Thread(new ConcurrentBookingProcessor(queue, inventory, service));
-
-        t1.start(); t2.start();
-
-        try { t1.join(); t2.join(); } catch (InterruptedException e) { e.printStackTrace(); }
-
-        System.out.println("\nRemaining Inventory:\nSingle: " + inventory.single + "\nDouble: " + inventory.doubleR + "\nSuite: " + inventory.suite);
+        new AnalyticsService().generateReport(bookings);
     }
 }
